@@ -25,6 +25,14 @@ class Settingslogic < Hash
       @source ||= value
     end
 
+    def default_namespace(value = nil)
+      if value.nil?
+        @default_namespace
+      else
+        @default_namespace = value
+      end
+    end
+
     def namespace(value = nil)
       @namespace ||= value
     end
@@ -101,9 +109,16 @@ class Settingslogic < Hash
     else
       file_contents = open(hash_or_file).read
       hash = file_contents.empty? ? {} : YAML.load(ERB.new(file_contents).result).to_hash
+      overrides = hash
+      defaults = {}
       if self.class.namespace
-        hash = hash[self.class.namespace] or return missing_key("Missing setting '#{self.class.namespace}' in #{hash_or_file}")
+        overrides = hash[self.class.namespace] or return missing_key("Missing setting '#{self.class.namespace}' in #{hash_or_file}")
       end
+      if self.class.default_namespace
+        defaults = hash[self.class.default_namespace] || {}
+        overrides = {} unless self.class.namespace
+      end
+      hash = hash_deep_merge(defaults, overrides)
       self.replace hash
     end
     @section = section || self.class.source  # so end of error says "in application.yml"
@@ -188,4 +203,14 @@ class Settingslogic < Hash
 
     raise MissingSetting, msg
   end
+
+  # http://api.rubyonrails.org/classes/ActiveSupport/CoreExtensions/Hash/DeepMerge.html
+  def hash_deep_merge(hash, other_hash)
+    hash.merge(other_hash) do |key, oldval, newval|
+      oldval = oldval.to_hash if oldval.respond_to?(:to_hash)
+      newval = newval.to_hash if newval.respond_to?(:to_hash)
+      oldval.class.to_s == 'Hash' && newval.class.to_s == 'Hash' ? self.hash_deep_merge(oldval, newval) : newval
+    end
+  end
+
 end

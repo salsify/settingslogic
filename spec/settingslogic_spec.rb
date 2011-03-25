@@ -196,6 +196,146 @@ describe "Settingslogic" do
     Settings.send(:instance).should be_is_a(Hash)
   end
 
+  describe "default namespace functionality" do
+    before do
+      Settings5.instance_variable_set(:@default_namespace, nil)
+      Settings5.instance_variable_set(:@namespace, nil)
+    end
+    describe "without default_namespace and with namespace" do
+      it "should not merge settings from default_namespace" do
+        Settings5.instance_variable_set(:@default_namespace, nil)
+        Settings5.namespace('production')
+        Settings5.reload!
+
+        Settings5.to_hash.should == {
+          'binaries' => {
+            'mysql'     => "/usr/bin/mysql51",
+          }
+        }
+      end
+
+      it "should have empty settings if namespace does NOT exists" do
+        Settings5.instance_variable_set(:@default_namespace, nil)
+        Settings5.namespace('testing')
+        Settings5.reload!
+        Settings5.to_hash.should == { }
+      end
+    end
+
+    describe "with default_namespace and without namespace" do
+      it "should merge default_namespace and namespace settings" do
+        Settings5.default_namespace('defaults')
+        Settings5.instance_variable_set(:@namespace, nil)
+        Settings5.reload!
+
+        Settings5.to_hash.should == {
+          'binaries' => {
+            'git'       => "/usr/bin/git",
+            'mysql'     => "/usr/bin/mysql",
+          },
+          'deep'  => {
+            'level' => 0,
+            'h1' => {
+              'level' => 1,
+              'h2' => {
+                'level' => 2,
+                'type'  => 'rgb',
+                'colors' => %w(red green blue)
+              }
+            }
+          }
+        }
+      end
+
+      it "should have empty settings if defaults_namespace does NOT exists" do
+        Settings5.default_namespace('common')
+        Settings5.instance_variable_set(:@namespace, nil)
+        Settings5.reload!
+        Settings5.to_hash.should == { }
+      end
+    end
+
+    describe "with default_namespace and namespace" do
+      it "should merge default_namespace and namespace settings" do
+        Settings5.default_namespace('defaults')
+        Settings5.namespace('production')
+        Settings5.reload!
+
+        Settings5.to_hash.should == {
+          'binaries' => {
+            'git'       => "/usr/bin/git",
+            'mysql'     => "/usr/bin/mysql51",
+          },
+          'deep'  => {
+            'level' => 0,
+            'h1' => {
+              'level' => 1,
+              'h2' => {
+                'level' => 2,
+                'type'  => 'rgb',
+                'colors' => %w(red green blue)
+              }
+            }
+          }
+        }
+      end
+
+      it "should deep merge complex default_namespace and namespace settings" do
+        Settings5.default_namespace('defaults')
+        Settings5.namespace('test')
+        Settings5.reload!
+
+        Settings5.to_hash.should == {
+          'binaries' => {
+            'git'       => "/usr/bin/git",
+            'mysql'     => "/usr/bin/mysql",
+          },
+          'deep'  => {
+            'level' => 0,
+            'h1' => {
+              'list' => %w(a b),
+              'level' => 1,
+              'h2' => {
+                'level' => 2,
+                'type'  => 'cmyk',
+                'colors' => %w(cyan magenta yellow black)
+              }
+            }
+          }
+        }
+      end
+
+      it "should use custome namespace names" do
+        Settings5.default_namespace('production')
+        Settings5.namespace('test')
+        Settings5.reload!
+
+        Settings5.to_hash.should == {
+          'binaries' => {
+            'mysql'     => "/usr/bin/mysql51",
+          },
+          'deep'  => {
+            'h1' => {
+              'list' => %w(a b),
+              'h2' => {
+                'type'  => 'cmyk',
+                'colors' => %w(cyan magenta yellow black)
+              }
+            }
+          }
+        }
+      end
+
+      it "should have empty settings if defaults_namespace and namespace does NOT exist" do
+        Settings5.default_namespace('common')
+        Settings5.namespace('testing')
+        Settings5.reload!
+        Settings5.to_hash.should == { }
+      end
+    end
+
+  end
+
   describe "#to_hash" do
     it "should return a new instance of a Hash object" do
       Settings.to_hash.should be_kind_of(Hash)
